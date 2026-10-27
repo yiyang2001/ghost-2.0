@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111318">
+<title>GHOST 换头</title>
+<style>
+:root { --bg:#111318; --card:#1b1e26; --line:#2b2f3a; --text:#e9ebf0; --dim:#9097a8; --accent:#6c8cff; --ok:#46c28e; --bad:#ff6b6b; }
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { margin:0; background:var(--bg); color:var(--text); font:16px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif; padding:0 16px calc(24px + env(safe-area-inset-bottom)); }
+main { max-width:640px; margin:0 auto; }
+h1 { font-size:20px; margin:20px 0 4px; }
+h2 { font-size:15px; margin:0 0 10px; color:var(--dim); font-weight:600; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-top:14px; }
+.sub { color:var(--dim); font-size:13px; margin:0; }
+.badge { display:inline-block; font-size:12px; padding:2px 10px; border-radius:99px; background:var(--line); color:var(--dim); }
+.badge.ready { background:#1f3a31; color:var(--ok); } .badge.error { background:#412428; color:var(--bad); }
+.pick { display:flex; align-items:center; justify-content:center; gap:8px; min-height:52px; border:1.5px dashed var(--line); border-radius:12px; color:var(--accent); font-weight:600; cursor:pointer; }
+.pick input { display:none; }
+.thumbs { display:grid; grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:8px; margin-top:10px; }
+.thumbs:empty { display:none; }
+.thumb { position:relative; aspect-ratio:1; border-radius:10px; overflow:hidden; background:#000; }
+.thumb img, .thumb video { width:100%; height:100%; object-fit:cover; display:block; }
+.thumb button { position:absolute; top:4px; right:4px; width:26px; height:26px; border:0; border-radius:50%; background:rgba(0,0,0,.65); color:#fff; font-size:16px; line-height:26px; padding:0; }
+.preview { margin-top:10px; border-radius:10px; overflow:hidden; background:#000; }
+.preview:empty { display:none; }
+.preview img, .preview video { width:100%; max-height:46vh; object-fit:contain; display:block; }
+details summary { cursor:pointer; color:var(--dim); font-size:14px; padding:4px 0; }
+.opt { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; font-size:15px; }
+.opt small { display:block; color:var(--dim); font-size:12px; }
+.opt input[type=number], .opt select { width:96px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:8px; font-size:16px; }
+.opt input[type=checkbox] { width:22px; height:22px; accent-color:var(--accent); }
+.btn { display:block; width:100%; border:0; border-radius:12px; padding:15px; margin-top:14px; background:var(--accent); color:#fff; font-size:17px; font-weight:700; }
+.btn:disabled { opacity:.45; }
+.btn.ghost { background:var(--line); color:var(--text); margin-top:10px; padding:11px; font-size:15px; }
+.bar { height:8px; border-radius:99px; background:var(--line); overflow:hidden; margin:10px 0 6px; }
+.bar i { display:block; height:100%; width:0; background:var(--accent); transition:width .3s; }
+.row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.err { color:var(--bad); font-size:14px; word-break:break-word; }
+.result img, .result video { width:100%; border-radius:10px; background:#000; display:block; margin-top:10px; }
+.links { display:flex; gap:10px; margin-top:10px; }
+.links a { flex:1; text-align:center; padding:11px; border-radius:10px; background:var(--line); color:var(--text); text-decoration:none; font-size:15px; }
+.grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.grid .cell { position:relative; aspect-ratio:1; border-radius:10px; overflow:hidden; background:#000; }
+.grid img, .grid video { width:100%; height:100%; object-fit:cover; display:block; }
+.grid .tag { position:absolute; left:4px; bottom:4px; font-size:11px; padding:1px 6px; border-radius:6px; background:rgba(0,0,0,.65); }
+.hide { display:none !important; }
+dialog { width:min(94vw,640px); background:var(--card); color:var(--text); border:1px solid var(--line); border-radius:14px; padding:14px; }
+dialog::backdrop { background:rgba(0,0,0,.7); }
+dialog img, dialog video { width:100%; max-height:70vh; object-fit:contain; border-radius:10px; background:#000; display:block; }
+.notice { font-size:12px; color:var(--dim); margin-top:18px; text-align:center; }
+</style>
+</head>
+<body>
+<main>
+	<div class="row"><h1>GHOST 换头</h1><span id="engine" class="badge">连接中…</span></div>
+	<p class="sub">来源照片的头部会被合成到目标图片 / 视频里。</p>
+
+	<section class="card">
+		<h2>① 来源照片（可多选，越多越稳）</h2>
+		<label class="pick"><input id="sourceInput" type="file" accept="image/*" multiple>＋ 选择照片</label>
+		<div id="sourceThumbs" class="thumbs"></div>
+	</section>
+
+	<section class="card">
+		<h2>② 目标图片或视频</h2>
+		<label class="pick"><input id="targetInput" type="file" accept="image/*,video/*">＋ 选择图片 / 视频</label>
+		<div id="targetPreview" class="preview"></div>
+	</section>
+
+	<section class="card">
+		<details>
+			<summary>③ 高级选项</summary>
+			<label class="opt"><span>保留来源的发色/眉/唇色<small>关闭则颜色更多取自目标</small></span><input id="optColors" type="checkbox" checked></label>
+			<label class="opt"><span>贴回方式<small>边缘不自然时试“整块”</small></span><select id="optPaste"><option value="head">仅头部</option><option value="rect">整块</option></select></label>
+			<div id="videoOptions" class="hide">
+				<label class="opt"><span>起始秒<small>只处理一段，先试几秒</small></span><input id="optStart" type="number" min="0" step="0.5" value="0"></label>
+				<label class="opt"><span>结束秒<small>0 = 到结尾</small></span><input id="optEnd" type="number" min="0" step="0.5" value="0"></label>
+				<label class="opt"><span>帧间融合<small>0~0.5，减轻闪烁，过大会重影</small></span><input id="optBlend" type="number" min="0" max="0.5" step="0.1" value="0"></label>
+				<label class="opt"><span>画质 CRF<small>越小越清晰，文件越大</small></span><input id="optCrf" type="number" min="10" max="30" step="1" value="16"></label>
+			</div>
+		</details>
+		<button id="go" class="btn" disabled>开始合成</button>
+	</section>
+
+	<section id="jobCard" class="card hide">
+		<div class="row"><h2 id="jobTitle" style="margin:0">任务</h2><span id="jobBadge" class="badge"></span></div>
+		<div class="bar"><i id="jobBar"></i></div>
+		<div id="jobText" class="sub"></div>
+		<div id="jobError" class="err"></div>
+		<div id="jobResult" class="result"></div>
+		<button id="cancel" class="btn ghost hide">取消</button>
+	</section>
+
+	<section id="historyCard" class="card hide">
+		<h2>历史结果</h2>
+		<div id="history" class="grid"></div>
+	</section>
+
+	<p class="notice">仅在取得相关人物同意的情况下使用；分享时请说明内容经过 AI 合成。</p>
+</main>
+
+<dialog id="viewer">
+	<div id="viewerBody"></div>
+	<div class="links">
+		<a id="viewerDownload" href="#">下载</a>
+		<a id="viewerDelete" href="#">删除</a>
+		<a id="viewerClose" href="#">关闭</a>
+	</div>
+</dialog>
+
+<script>
+const $ = id => document.getElementById(id);
+const IMAGE = /\.(jpe?g|png|webp|bmp)$/i, VIDEO = /\.(mp4|mov|mkv|avi|webm|m4v)$/i;
+const state = { sources: [], target: null, activeJob: null, busy: false };
+
+function extOf(file) {
+	const match = /\.[A-Za-z0-9]{2,5}$/.exec(file.name || '');
+	if (match) return match[0].toLowerCase();
+	return file.type.startsWith('video/') ? '.mp4' : '.jpg';
+}
+function isVideo(file) { return file.type.startsWith('video/') || VIDEO.test(file.name || ''); }
+function media(url, video, extra) {
+	const el = document.createElement(video ? 'video' : 'img');
+	el.src = url;
+	if (video) { el.muted = true; el.playsInline = true; el.preload = 'metadata'; Object.assign(el, extra || {}); }
+	return el;
+}
+function refresh() {
+	$('go').disabled = state.busy || !state.sources.length || !state.target;
+	$('videoOptions').classList.toggle('hide', !(state.target && isVideo(state.target)));
+}
+
+function renderSources() {
+	const box = $('sourceThumbs');
+	box.replaceChildren();
+	state.sources.forEach((file, index) => {
+		const cell = document.createElement('div');
+		cell.className = 'thumb';
+		const remove = document.createElement('button');
+		remove.textContent = '×';
+		remove.onclick = () => { state.sources.splice(index, 1); renderSources(); };
+		cell.append(media(URL.createObjectURL(file), false), remove);
+		box.append(cell);
+	});
+	refresh();
+}
+$('sourceInput').onchange = event => {
+	state.sources.push(...event.target.files);
+	event.target.value = '';
+	renderSources();
+};
+$('targetInput').onchange = event => {
+	state.target = event.target.files[0] || null;
+	event.target.value = '';
+	const box = $('targetPreview');
+	box.replaceChildren();
+	if (state.target) {
+		const video = isVideo(state.target);
+		box.append(media(URL.createObjectURL(state.target), video, { controls: true }));
+	}
+	refresh();
+};
+
+function upload(file, onProgress) {
+	return new Promise((resolve, reject) => {
+		const request = new XMLHttpRequest();
+		request.open('POST', '/api/upload?name=' + encodeURIComponent('file' + extOf(file)));
+		request.upload.onprogress = event => event.lengthComputable && onProgress(event.loaded);
+		request.onload = () => {
+			let body = {};
+			try { body = JSON.parse(request.responseText); } catch (e) {}
+			request.status === 200 && body.id ? resolve(body.id) : reject(new Error(body.error || '上传失败'));
+		};
+		request.onerror = () => reject(new Error('网络中断'));
+		request.send(file);
+	});
+}
+
+function showJob(job) {
+	$('jobCard').classList.remove('hide');
+	const labels = { queued: '排队中', running: '处理中', done: '完成', error: '失败', cancelled: '已取消' };
+	const badge = $('jobBadge');
+	badge.textContent = labels[job.status] || job.status;
+	badge.className = 'badge ' + (job.status === 'done' ? 'ready' : job.status === 'error' ? 'error' : '');
+	const active = job.status === 'queued' || job.status === 'running';
+	$('cancel').classList.toggle('hide', !active);
+	$('jobError').textContent = job.error || '';
+	let percent = 0, text = '';
+	if (job.status === 'queued') text = engineReady ? '前面还有任务，请稍候…' : '模型加载中，加载完会自动开始…';
+	else if (job.kind === 'video' && job.total) {
+		percent = job.done / job.total * 100;
+		text = `第 ${job.done} / ${job.total} 帧 · ${job.fps} 帧/秒` + (job.eta != null ? ` · 约剩 ${formatTime(job.eta)}` : '');
+	} else if (job.status === 'running') { percent = 50; text = '处理中…'; }
+	if (job.status === 'done') percent = 100;
+	$('jobBar').style.width = percent + '%';
+	$('jobText').textContent = text;
+	const result = $('jobResult');
+	if (job.status === 'done' && job.result && result.dataset.name !== job.result) {
+		result.dataset.name = job.result;
+		result.replaceChildren(media('/files/' + job.result, job.kind === 'video', { controls: true, loop: true }), linkRow(job.result));
+	} else if (job.status !== 'done') { result.replaceChildren(); delete result.dataset.name; }
+	$('cancel').onclick = () => fetch('/api/cancel', { method: 'POST', body: JSON.stringify({ id: job.id }) });
+}
+function linkRow(name) {
+	const row = document.createElement('div');
+	row.className = 'links';
+	const link = document.createElement('a');
+	link.href = '/files/' + name + '?download=1';
+	link.textContent = '下载 / 保存';
+	row.append(link);
+	return row;
+}
+function formatTime(seconds) {
+	return seconds >= 60 ? Math.floor(seconds / 60) + ' 分 ' + (seconds % 60) + ' 秒' : seconds + ' 秒';
+}
+
+$('go').onclick = async () => {
+	state.busy = true; refresh();
+	try {
+		const files = [...state.sources, state.target];
+		const total = files.reduce((sum, file) => sum + file.size, 0);
+		let sent = 0;
+		const ids = [];
+		$('jobCard').classList.remove('hide');
+		$('jobBadge').textContent = '上传中'; $('jobBadge').className = 'badge';
+		$('jobError').textContent = ''; $('jobResult').replaceChildren(); $('cancel').classList.add('hide');
+		for (const file of files) {
+			const id = await upload(file, loaded => {
+				const percent = (sent + loaded) / total * 100;
+				$('jobBar').style.width = percent + '%';
+				$('jobText').textContent = `上传 ${(percent).toFixed(0)}%`;
+			});
+			sent += file.size;
+			ids.push(id);
+		}
+		const response = await fetch('/api/jobs', { method: 'POST', body: JSON.stringify({
+			sources: ids.slice(0, -1), target: ids[ids.length - 1],
+			options: {
+				paste: $('optPaste').value, keep_source_colors: $('optColors').checked,
+				start: $('optStart').value, end: $('optEnd').value, temporal_blend: $('optBlend').value, crf: $('optCrf').value
+			}
+		}) });
+		const job = await response.json();
+		if (!response.ok) throw new Error(job.error || '创建任务失败');
+		state.activeJob = job.id;
+		showJob(job);
+	} catch (error) {
+		$('jobBadge').textContent = '失败'; $('jobBadge').className = 'badge error';
+		$('jobError').textContent = error.message;
+	}
+	state.busy = false; refresh();
+};
+
+let engineReady = false;
+async function poll() {
+	try {
+		const data = await (await fetch('/api/state', { cache: 'no-store' })).json();
+		engineReady = data.engine.state === 'ready';
+		const badge = $('engine');
+		badge.textContent = engineReady ? '模型就绪' : data.engine.state === 'error' ? '加载失败' : '模型加载中…';
+		badge.className = 'badge ' + (engineReady ? 'ready' : data.engine.state === 'error' ? 'error' : '');
+		badge.title = data.engine.message;
+		if (data.engine.state === 'error') { $('jobCard').classList.remove('hide'); $('jobError').textContent = data.engine.message; }
+		const job = data.jobs.find(item => item.id === state.activeJob);
+		if (job) showJob(job);
+		renderHistory(data.history);
+	} catch (error) {
+		$('engine').textContent = '连接断开'; $('engine').className = 'badge error';
+	}
+	setTimeout(poll, 1200);
+}
+
+let historyKey = '';
+function renderHistory(items) {
+	const key = items.map(item => item.name).join();
+	if (key === historyKey) return;
+	historyKey = key;
+	$('historyCard').classList.toggle('hide', !items.length);
+	const grid = $('history');
+	grid.replaceChildren();
+	for (const item of items) {
+		const cell = document.createElement('div');
+		cell.className = 'cell';
+		const thumb = media('/files/' + item.name + (item.video ? '#t=0.1' : ''), item.video);
+		cell.append(thumb);
+		if (item.video) { const tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = '视频'; cell.append(tag); }
+		cell.onclick = () => openViewer(item);
+		grid.append(cell);
+	}
+}
+function openViewer(item) {
+	$('viewerBody').replaceChildren(media('/files/' + item.name, item.video, { controls: true, loop: true }));
+	$('viewerDownload').href = '/files/' + item.name + '?download=1';
+	$('viewerDelete').onclick = async event => {
+		event.preventDefault();
+		if (!confirm('删除这个结果？')) return;
+		await fetch('/api/delete', { method: 'POST', body: JSON.stringify({ name: item.name }) });
+		historyKey = '';
+		$('viewer').close();
+	};
+	$('viewer').showModal();
+}
+$('viewerClose').onclick = event => { event.preventDefault(); $('viewer').close(); };
+$('viewer').addEventListener('close', () => $('viewerBody').replaceChildren());
+
+poll();
+</script>
+</body>
+</html>

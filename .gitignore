@@ -179,3 +179,9 @@ src/losses/gaze_models/
 *.png
 blender_checkpoints/
 
+
+# local runtime data and downloaded models (restore models with download_models.ps1)
+.torch/
+output/
+source/
+web_data/
